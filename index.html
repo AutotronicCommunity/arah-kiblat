@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arah Kiblat</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    video {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      z-index: -1;
+    }
+
+    .arrow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100px;
+      height: 100px;
+      margin-top: -50px;
+      margin-left: -50px;
+      background: url('https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Compass_rose_pale.svg/1200px-Compass_rose_pale.svg.png') no-repeat center center;
+      background-size: contain;
+      transform-origin: 50% 50%;
+    }
+  </style>
+</head>
+<body>
+
+<video id="camera" autoplay playsinline muted></video>
+<div class="arrow" id="arrow"></div>
+
+<script>
+  const meccaLat = 21.4225;
+  const meccaLng = 39.8262;
+
+  let currentLat = 0;
+  let currentLng = 0;
+  let deviceHeading = 0;
+
+  navigator.geolocation.watchPosition(pos => {
+    currentLat = pos.coords.latitude;
+    currentLng = pos.coords.longitude;
+    updateArrow();
+  });
+
+  window.addEventListener("deviceorientationabsolute", handleOrientation, true);
+  window.addEventListener("deviceorientation", handleOrientation, true);
+
+  function handleOrientation(event) {
+    const heading = event.alpha;
+    if (heading != null) {
+      deviceHeading = heading;
+      updateArrow();
+    }
+  }
+
+  function calculateQiblaDirection(lat, lng) {
+    const φ = toRadians(lat);
+    const λ = toRadians(lng);
+    const φk = toRadians(meccaLat);
+    const λk = toRadians(meccaLng);
+
+    const qibla = Math.atan2(Math.sin(λk - λ), Math.cos(φ) * Math.tan(φk) - Math.sin(φ) * Math.cos(λk - λ));
+    return (toDegrees(qibla) + 360) % 360;
+  }
+
+  function toRadians(deg) {
+    return deg * Math.PI / 180;
+  }
+
+  function toDegrees(rad) {
+    return rad * 180 / Math.PI;
+  }
+
+  function updateArrow() {
+    if (currentLat === 0 && currentLng === 0) return;
+    const qiblaDirection = calculateQiblaDirection(currentLat, currentLng);
+    const angle = qiblaDirection - deviceHeading;
+    document.getElementById('arrow').style.transform = `rotate(${angle}deg)`;
+  }
+
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+    .then(stream => {
+      document.getElementById('camera').srcObject = stream;
+    })
+    .catch(err => {
+      alert("Tidak dapat mengakses kamera: " + err);
+    });
+</script>
+
+</body>
+</html>
