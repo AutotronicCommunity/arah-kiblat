@@ -32,29 +32,59 @@
       background-size: contain;
       transform-origin: 50% 50%;
     }
+
+    #info {
+      position: absolute;
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      font-size: 16px;
+      z-index: 1;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
 
 <video id="camera" autoplay playsinline muted></video>
 <div class="arrow" id="arrow"></div>
+<div id="info">
+  <p id="location"></p>
+  <p id="qibla-direction"></p>
+  <p id="distance"></p>
+</div>
 
 <script>
   const meccaLat = 21.4225;
   const meccaLng = 39.8262;
-
   let currentLat = 0;
   let currentLng = 0;
   let deviceHeading = 0;
 
+  // Mengambil lokasi perangkat
   navigator.geolocation.watchPosition(pos => {
     currentLat = pos.coords.latitude;
     currentLng = pos.coords.longitude;
+    document.getElementById('location').textContent = `Lokasi: ${currentLat.toFixed(4)}, ${currentLng.toFixed(4)}`;
     updateArrow();
+    updateDistance();
+  }, err => {
+    console.log("Gagal mendapatkan lokasi:", err);
   });
 
-  window.addEventListener("deviceorientationabsolute", handleOrientation, true);
-  window.addEventListener("deviceorientation", handleOrientation, true);
+  // Mengambil orientasi perangkat (kompas)
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission()
+      .then(permissionState => {
+        if (permissionState === 'granted') {
+          window.addEventListener("deviceorientation", handleOrientation, true);
+        }
+      })
+      .catch(console.error);
+  } else {
+    window.addEventListener("deviceorientation", handleOrientation, true);
+  }
 
   function handleOrientation(event) {
     const heading = event.alpha;
@@ -64,6 +94,7 @@
     }
   }
 
+  // Menghitung arah Kiblat dari posisi perangkat
   function calculateQiblaDirection(lat, lng) {
     const φ = toRadians(lat);
     const λ = toRadians(lng);
@@ -74,12 +105,16 @@
     return (toDegrees(qibla) + 360) % 360;
   }
 
-  function toRadians(deg) {
-    return deg * Math.PI / 180;
-  }
-
-  function toDegrees(rad) {
-    return rad * 180 / Math.PI;
+  // Menghitung jarak ke Mekah (dalam kilometer)
+  function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // radius Bumi dalam km
+    const dLat = toRadians(lat2 - lat1);
+    const dLon = toRadians(lon2 - lon1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Jarak dalam km
   }
 
   function updateArrow() {
@@ -87,8 +122,16 @@
     const qiblaDirection = calculateQiblaDirection(currentLat, currentLng);
     const angle = qiblaDirection - deviceHeading;
     document.getElementById('arrow').style.transform = `rotate(${angle}deg)`;
+    document.getElementById('qibla-direction').textContent = `Arah Kiblat: ${qiblaDirection.toFixed(2)}°`;
   }
 
+  function updateDistance() {
+    if (currentLat === 0 && currentLng === 0) return;
+    const distance = calculateDistance(currentLat, currentLng, meccaLat, meccaLng);
+    document.getElementById('distance').textContent = `Jarak ke Mekah: ${distance.toFixed(2)} km`;
+  }
+
+  // Mendapatkan akses kamera
   navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
     .then(stream => {
       document.getElementById('camera').srcObject = stream;
@@ -96,6 +139,15 @@
     .catch(err => {
       alert("Tidak dapat mengakses kamera: " + err);
     });
+
+  // Fungsi untuk konversi derajat ke radian dan sebaliknya
+  function toRadians(deg) {
+    return deg * Math.PI / 180;
+  }
+
+  function toDegrees(rad) {
+    return rad * 180 / Math.PI;
+  }
 </script>
 
 </body>
